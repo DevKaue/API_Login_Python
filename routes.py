@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer
+import requests
 from sqlalchemy.orm import Session
 from database import SessionLocal
 from dataBase.models import Usuario
@@ -15,7 +17,7 @@ def get_db():
     finally:
         db.close()
 
-@router.post("/auth/login")
+@router.post("/login")
 def login(login_data: LoginSchema, db: Session = Depends(get_db)):
     usuario = db.query(Usuario).filter(Usuario.email == login_data.email).first()
     if not usuario or not verificar_senha(login_data.senha, usuario.senha):
@@ -23,6 +25,21 @@ def login(login_data: LoginSchema, db: Session = Depends(get_db)):
 
     token = criar_token_jwt({"sub": usuario.email})
     return {"token": token}
+
+@router.post("/validate_token")
+def validate_token(token: str, db: Session = Depends(get_db)):
+    try:
+        payload = verificar_token(token)
+        email = payload["sub"]
+        user = db.query(Usuario).filter(Usuario.email == email).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        return {"valid": True, "user_id": user.id}
+
+    except HTTPException:
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado")
+    except Exception as e:
+       raise HTTPException(status_code=500, detail="Erro ao validar o token")
 
 @router.post("/auth/registrar", response_model=UsuarioResponse)
 def registrar(usuario: UsuarioCreate, db: Session = Depends(get_db)):

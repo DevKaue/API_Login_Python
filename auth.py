@@ -1,4 +1,4 @@
-import jwt
+from jose import jwt
 import bcrypt
 import os
 from datetime import datetime, timedelta
